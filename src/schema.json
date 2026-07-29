@@ -1,0 +1,71 @@
+{
+    "tables": [
+        {
+            "name": "roles",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "increments"
+                },
+                {
+                    "name": "name",
+                    "type": "string",
+                    "unique": true
+                }
+            ]
+        },
+        {
+            "name": "users",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "increments"
+                },
+                {
+                    "name": "email",
+                    "type": "string",
+                    "unique": true,
+                    "required": true
+                },
+                {
+                    "name": "password",
+                    "type": "string",
+                    "required": true
+                },
+                {
+                    "name": "role_id",
+                    "type": "integer",
+                    "references": {
+                        "table": "roles",
+                        "column": "id"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "blogs",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "increments"
+                },
+                {
+                    "name": "title",
+                    "type": "string"
+                },
+                {
+                    "name": "content",
+                    "type": "string"
+                },
+                {
+                    "name": "created_by",
+                    "type": "integer",
+                    "references": {
+                        "table": "users",
+                        "column": "id"
+                    }
+                }
+            ]
+        }
+    ]
+}
