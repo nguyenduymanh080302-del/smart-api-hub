@@ -18,6 +18,8 @@ export default defineConfig({
             include: ["src/**/*.ts"],
             exclude: ["src/knexfile.ts", "src/types/**"],
         },
+        // Avoid running compiled files in dist directory
+        exclude: ["**/node_modules/**", "**/dist/**"],
         // Run tests sequentially to avoid DB race conditions
         fileParallelism: false,
     },

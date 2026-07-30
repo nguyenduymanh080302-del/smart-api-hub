@@ -160,7 +160,7 @@ export const findMany = async (resource: string, options: FindManyOptions): Prom
  * @returns A promise resolving to the database insertion result (usually insertion ID(s)).
  */
 export const create = async (resource: string, data: any): Promise<any> => {
-    return await db(resource).insert(data);
+    return await db(resource).insert(data).returning("*");
 };
 
 /**

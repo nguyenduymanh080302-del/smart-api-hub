@@ -1,6 +1,6 @@
 import { type Request, type Response } from "express";
 import * as resourceService from "../services/resource.service";
-import { validatePutBody } from "../validator/queryValidator";
+import { validateResourceBody } from "../validator/resource.validator";
 
 /**
  * Controller handler to retrieve a list of resource items.
@@ -12,16 +12,14 @@ export const getResource = async (req: Request, res: Response) => {
 
     if (!resource) {
         return res.status(400).json({
-            status: "error",
-            message: "Resource is required"
+            error: "Resource is required"
         });
     }
 
     try {
         if (!await resourceService.resourceExists(resource)) {
             return res.status(404).json({
-                status: "error",
-                message: "Resource not found"
+                error: "Resource not found"
             });
         }
 
@@ -52,10 +50,10 @@ export const getResource = async (req: Request, res: Response) => {
         return res.status(200).json({
             data: rows,
         });
-    } catch (error) {
-        console.error(`${resource} DB ping failed: ${error}`);
+    } catch (error: any) {
+        console.error(`${resource} DB query failed: ${error}`);
         return res.status(500).json({
-            status: "error"
+            error: error.message || "Internal Server Error"
         });
     }
 };
@@ -69,27 +67,33 @@ export const createResource = async (req: Request, res: Response) => {
 
     if (!resource) {
         return res.status(400).json({
-            status: "error",
-            message: "Resource is required"
+            error: "Resource is required"
+        });
+    }
+
+    // 1. Zod schema validation for POST endpoint
+    const validation = validateResourceBody(resource, data, false);
+    if (!validation.valid) {
+        return res.status(400).json({
+            error: validation.message
         });
     }
 
     try {
         if (!await resourceService.resourceExists(resource)) {
             return res.status(404).json({
-                status: "error",
-                message: "Resource not found"
+                error: "Resource not found"
             });
         }
 
-        const result = await resourceService.create(resource, data);
+        const result = await resourceService.create(resource, validation.data);
         return res.status(201).json({
             data: result,
         });
-    } catch (error) {
-        console.error(`${resource} DB ping failed: ${error}`);
+    } catch (error: any) {
+        console.error(`${resource} DB create failed: ${error}`);
         return res.status(500).json({
-            status: "error",
+            error: error.message || "Internal Server Error",
             data: [],
         });
     }
@@ -97,7 +101,6 @@ export const createResource = async (req: Request, res: Response) => {
 
 /**
  * Controller handler to replace or update a resource record completely.
- * Includes payload field validation.
  */
 export const updateResource = async (req: Request, res: Response) => {
     const data = req.body;
@@ -106,50 +109,45 @@ export const updateResource = async (req: Request, res: Response) => {
 
     if (!id) {
         return res.status(400).json({
-            status: "error",
-            message: "Resource ID is required"
+            error: "Resource ID is required"
         });
     }
 
     if (!resource) {
         return res.status(400).json({
-            status: "error",
-            message: "Resource is required"
+            error: "Resource is required"
         });
     }
 
-    // Validate the complete PUT request payload structure against schema
-    const validation = validatePutBody(resource, data);
+    // 1. Zod schema validation for PUT endpoint (strict matching)
+    const validation = validateResourceBody(resource, data, false);
     if (!validation.valid) {
         return res.status(400).json({
-            status: "error",
-            message: validation.message,
+            error: validation.message
         });
     }
 
     try {
         if (!await resourceService.resourceExists(resource)) {
             return res.status(404).json({
-                status: "error",
-                message: "Resource not found"
+                error: "Resource not found"
             });
         }
 
-        const result = await resourceService.update(resource, id, data);
+        const result = await resourceService.update(resource, id, validation.data);
         if (result === 0) {
             return res.status(404).json({
-                status: "error",
-                message: `Resource ${id} not found`
+                error: `Resource ${id} not found`
             });
         }
 
         return res.status(200).json({
             data: result,
         });
-    } catch (error) {
-        console.error(`${resource} DB ping failed: ${error}`);
+    } catch (error: any) {
+        console.error(`${resource} DB update failed: ${error}`);
         return res.status(500).json({
-            status: "error",
+            error: error.message || "Internal Server Error",
             data: [],
         });
     }
@@ -165,42 +163,45 @@ export const patchResource = async (req: Request, res: Response) => {
 
     if (!id) {
         return res.status(400).json({
-            status: "error",
-            message: "Resource ID is required"
+            error: "Resource ID is required"
         });
     }
 
     if (!resource) {
         return res.status(400).json({
-            status: "error",
-            message: "Resource is required"
+            error: "Resource is required"
+        });
+    }
+
+    // 1. Zod schema validation for PATCH endpoint (partial fields allowed)
+    const validation = validateResourceBody(resource, data, true);
+    if (!validation.valid) {
+        return res.status(400).json({
+            error: validation.message
         });
     }
 
     try {
         if (!await resourceService.resourceExists(resource)) {
             return res.status(404).json({
-                status: "error",
-                message: "Resource not found"
+                error: "Resource not found"
             });
         }
 
-        // Direct update logic handles patch fields
-        const result = await resourceService.update(resource, id, data);
+        const result = await resourceService.update(resource, id, validation.data);
         if (result === 0) {
             return res.status(404).json({
-                status: "error",
-                message: `Resource ${id} not found`
+                error: `Resource ${id} not found`
             });
         }
 
         return res.status(200).json({
             data: result,
         });
-    } catch (error) {
-        console.error(`${resource} DB ping failed: ${error}`);
+    } catch (error: any) {
+        console.error(`${resource} DB patch failed: ${error}`);
         return res.status(500).json({
-            status: "error",
+            error: error.message || "Internal Server Error",
             data: [],
         });
     }
@@ -215,41 +216,37 @@ export const deleteResource = async (req: Request, res: Response) => {
 
     if (!id) {
         return res.status(400).json({
-            status: "error",
-            message: "Resource ID is required"
+            error: "Resource ID is required"
         });
     }
 
     if (!resource) {
         return res.status(400).json({
-            status: "error",
-            message: "Resource is required"
+            error: "Resource is required"
         });
     }
 
     try {
         if (!await resourceService.resourceExists(resource)) {
             return res.status(404).json({
-                status: "error",
-                message: "Resource not found"
+                error: "Resource not found"
             });
         }
 
         const result = await resourceService.deleteById(resource, id);
         if (result === 0) {
             return res.status(404).json({
-                status: "error",
-                message: `Resource ${id} not found`
+                error: `Resource ${id} not found`
             });
         }
 
         return res.status(200).json({
             data: result,
         });
-    } catch (error) {
-        console.error(`${resource} DB ping failed: ${error}`);
+    } catch (error: any) {
+        console.error(`${resource} DB delete failed: ${error}`);
         return res.status(500).json({
-            status: "error",
+            error: error.message || "Internal Server Error",
             data: [],
         });
     }
