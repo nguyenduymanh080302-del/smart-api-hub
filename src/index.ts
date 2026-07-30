@@ -2,6 +2,7 @@ import "dotenv/config";
 
 import express, { type Express } from "express";
 import healthRouter from "./routes/health.route";
+import resourceRouter from "./routes/resource.route";
 import db from "./config/db";
 import { migrate } from "./generator/migrate";
 
@@ -14,6 +15,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
 app.use("/health", healthRouter);
+app.use("/", resourceRouter)
 
 async function bootstrap() {
     try {
@@ -36,7 +38,5 @@ async function bootstrap() {
         process.exit(1);
     }
 }
-// ─── Server ──────────────────────────────────────────────────────────────────
-app.listen(port, () => {
-    console.log(`[server] Running on http://localhost:${port}`);
-});
+
+bootstrap();

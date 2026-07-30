@@ -1,71 +1,28 @@
 {
-    "tables": [
+    "users": [
         {
-            "name": "roles",
-            "columns": [
-                {
-                    "name": "id",
-                    "type": "increments"
-                },
-                {
-                    "name": "name",
-                    "type": "string",
-                    "unique": true
-                }
-            ]
-        },
+            "id": 1,
+            "name": "Adam",
+            "email": "adam22@gmail.com",
+            "password": "123456",
+            "isActive": true,
+            "role": "admin"
+        }
+    ],
+    "posts": [
         {
-            "name": "users",
-            "columns": [
-                {
-                    "name": "id",
-                    "type": "increments"
-                },
-                {
-                    "name": "email",
-                    "type": "string",
-                    "unique": true,
-                    "required": true
-                },
-                {
-                    "name": "password",
-                    "type": "string",
-                    "required": true
-                },
-                {
-                    "name": "role_id",
-                    "type": "integer",
-                    "references": {
-                        "table": "roles",
-                        "column": "id"
-                    }
-                }
-            ]
-        },
+            "id": 1,
+            "title": "Hello",
+            "content": "Hello world",
+            "userId": 1
+        }
+    ],
+    "comments": [
         {
-            "name": "blogs",
-            "columns": [
-                {
-                    "name": "id",
-                    "type": "increments"
-                },
-                {
-                    "name": "title",
-                    "type": "string"
-                },
-                {
-                    "name": "content",
-                    "type": "string"
-                },
-                {
-                    "name": "created_by",
-                    "type": "integer",
-                    "references": {
-                        "table": "users",
-                        "column": "id"
-                    }
-                }
-            ]
+            "id": 1,
+            "content": "This is comment",
+            "postId": 1,
+            "userId": 1
         }
     ]
 }

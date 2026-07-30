@@ -3,12 +3,18 @@ interface ReferenceSchema {
     column: string;
 }
 
+type ColumnType =
+    | "increments"
+    | "integer"
+    | "float"
+    | "string"
+    | "boolean"
+    | "text"
+    | "timestamp";
+
 interface ColumnSchema {
     name: string;
-    type: "increments" | "integer" | "string" | "boolean" | "text" | "timestamp";
-    required?: boolean;
-    unique?: boolean;
-    references?: ReferenceSchema;
+    type: ColumnType;
 }
 
 interface TableSchema {
