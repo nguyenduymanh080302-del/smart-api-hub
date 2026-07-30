@@ -1,6 +1,9 @@
-interface ReferenceSchema {
-    table: string;
-    column: string;
+interface Relation {
+    parentTable: string;
+    parentKey: string;
+
+    childTable: string;
+    childKey: string;
 }
 
 type ColumnType =
