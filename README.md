@@ -62,7 +62,7 @@ The development server will be available at:
 http://localhost:<PORT>
 ```
 
-> The development server uses the `.env` configuration.
+> The development server uses the `.env.development` configuration.
 
 ---
 
@@ -74,7 +74,7 @@ Build and start the application:
 docker compose up --build
 ```
 
-> The production container uses `.env.production`.
+> The production container uses `.env`.
 
 ---
 

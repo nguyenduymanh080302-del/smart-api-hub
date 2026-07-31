@@ -7,6 +7,7 @@ import authRouter from "./routes/auth.route";
 import db from "./config/db";
 import { migrate } from "./generator/migrate";
 import { setupSwagger } from "./config/swagger";
+import { rateLimit } from "./middleware/rateLimit.middleware";
 
 const app: Express = express();
 
@@ -14,8 +15,9 @@ const app: Express = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-
 setupSwagger(app);
+
+app.use(rateLimit);
 app.use("/health", healthRouter);
 app.use("/auth", authRouter);
 app.use("/", resourceRouter);

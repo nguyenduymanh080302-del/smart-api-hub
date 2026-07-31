@@ -5,7 +5,7 @@ export default defineConfig({
     test: {
         globals: true,
         environment: "node",
-        setupFiles: ["dotenv/config"],
+        setupFiles: ["src/tests/setup.ts"],
         coverage: {
             provider: "v8",
             reporter: ["text", "lcov", "html"],
