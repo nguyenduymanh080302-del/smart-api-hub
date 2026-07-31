@@ -1,4 +1,6 @@
 import db from "../config/db";
+import { SENSITIVE_FIELDS } from "../utils/constant";
+import { removeSensitiveFields } from "../utils/helper";
 import { inferSchema } from "../utils/inferSchema";
 
 /**
@@ -20,9 +22,15 @@ export const resourceExists = async (resource: string): Promise<boolean> => {
  * @returns A promise resolving to the list of rows and optional total count for pagination.
  */
 export const findMany = async (resource: string, options: FindManyOptions): Promise<{ rows: any[]; totalCount?: number }> => {
+    const tableSchema = inferSchema().find(t => t.name === resource);
     const { fields = ["*"], filters = {}, q, sort, order = "asc", page, limit, expand = [], embed = [] } = options;
-
-    const query = db(resource).select(fields);
+    const selectedFields =
+        fields.includes("*") && tableSchema
+            ? tableSchema.columns
+                .map(c => c.name)
+                .filter(c => !SENSITIVE_FIELDS.includes(c))
+            : fields.filter(f => !SENSITIVE_FIELDS.includes(f));
+    const query = db(resource).select(selectedFields);
 
     Object.entries(filters).forEach(([key, value]) => {
         const [column, operator] = key.split("_");
@@ -51,7 +59,6 @@ export const findMany = async (resource: string, options: FindManyOptions): Prom
     });
 
     // Perform full-text search query across searchable string columns
-    const tableSchema = inferSchema().find(t => t.name === resource);
     if (q && tableSchema) {
         const searchableColumns = tableSchema.columns.filter(
             c => c.type === "string" || c.type === "text"
@@ -114,7 +121,8 @@ export const findMany = async (resource: string, options: FindManyOptions): Prom
 
         // Assign parent object to each row
         rows.forEach(row => {
-            row[parentTable] = parentMap.get(row[foreignKey]) ?? null;
+            const parent = parentMap.get(row[foreignKey]);
+            row[parentTable] = parent ? removeSensitiveFields(parent) : null;
         });
     }
 
@@ -145,11 +153,53 @@ export const findMany = async (resource: string, options: FindManyOptions): Prom
 
         // Assign the array of child records to each parent row
         rows.forEach(row => {
-            row[childTable] = grouped[row.id] ?? [];
+            row[childTable] = (grouped[row.id] ?? []).map(removeSensitiveFields);
         });
     }
 
     return { rows, totalCount };
+};
+
+/**
+ * Retrieves a single record from the specified resource table by its ID.
+ * Supports relationship expanding and embedding like findMany.
+ *
+ * @param resource - The database table name.
+ * @param id - The ID of the record to retrieve.
+ * @param options - Optional expand/embed relationship options.
+ * @returns A promise resolving to the row, or null if not found.
+ */
+export const findById = async (resource: string, id: string, options: Pick<FindManyOptions, "expand" | "embed"> = {}): Promise<any | null> => {
+    const { expand = [], embed = [] } = options;
+    const tableSchema = inferSchema().find(t => t.name === resource);
+    const selectedFields = tableSchema
+        ? tableSchema.columns
+            .map(c => c.name)
+            .filter(c => !SENSITIVE_FIELDS.includes(c))
+        : ["*"];
+    const row = await db(resource).select(selectedFields).where({ id }).first();
+    if (!row) return null;
+
+    // Resolve "expand" relationship (embed parent row based on foreign key match)
+    for (const parentTable of expand) {
+        const foreignKey = `${parentTable.slice(0, -1)}Id`;
+        const parentId = row[foreignKey];
+        if (!parentId) {
+            row[parentTable] = null;
+            continue;
+        }
+        const parent = await db(parentTable).where({ id: parentId }).first();
+        row[parentTable] = parent ? removeSensitiveFields(parent) : null;
+    }
+
+    // Resolve "embed" relationship (embed child rows based on parent key match)
+    for (const childTable of embed) {
+        const foreignKey = `${resource.slice(0, -1)}Id`;
+        const children = await db(childTable).where({ [foreignKey]: row.id });
+        row[childTable] = children.map(removeSensitiveFields);
+    }
+
+    return row;
 };
 
 /**
@@ -172,10 +222,16 @@ export const create = async (resource: string, data: any): Promise<any> => {
  * @returns A promise resolving to the number of affected rows (0 if not found).
  */
 export const update = async (resource: string, id: string, data: any): Promise<number> => {
+    const safeData = Object.fromEntries(
+        Object.entries(data).filter(
+            ([key]) => !SENSITIVE_FIELDS.includes(key)
+        )
+    );
+
     return await db(resource)
         .where({ id })
         .update({
-            ...data,
+            ...safeData,
             updated_at: db.fn.now()
         });
 };

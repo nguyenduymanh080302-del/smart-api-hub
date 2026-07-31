@@ -9,7 +9,7 @@ const inferType = (value: unknown) => {
 }
 
 export const inferSchema = (): TableSchema[] => {
-    const data = JSON.parse(fs.readFileSync(path.join(__dirname, "../schema.json"), "utf-8"))
+    const data = JSON.parse(fs.readFileSync(path.join(__dirname, "../../schema.json"), "utf-8"))
     const table: TableSchema[] = []
     for (const tableName in data) {
         // get table rows from json

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
     getResource,
+    getResourceById,
     createResource,
     updateResource,
     patchResource,
@@ -12,6 +13,9 @@ const router = Router();
 
 // Retrieve a list of resource records matching filters (Public)
 router.get("/:resource", getResource);
+
+// Retrieve a single resource record by ID (Public)
+router.get("/:resource/:id", getResourceById);
 
 // Create a new resource record 
 router.post("/:resource", authenticate, createResource);

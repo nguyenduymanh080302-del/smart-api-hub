@@ -1,7 +1,17 @@
 services:
+  app:
+    build: .
+    container_name: smart-api-hub
+    restart: unless-stopped
+    ports:
+      - "9999:9999"
+    depends_on:
+      - postgres
+    env_file:
+      - .env.production
   postgres:
     image: postgres:18.4
-    container_name: postgres-db
+    container_name: smart-api-hub-db
     restart: unless-stopped
     environment:
       POSTGRES_DB: postgres

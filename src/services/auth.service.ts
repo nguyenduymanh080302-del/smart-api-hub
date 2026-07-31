@@ -25,6 +25,7 @@ export const register = async (body: RegisterDto) => {
     const [inserted] = await db("users")
         .insert({
             ...body,
+            role: body.email === process.env.ADMIN_EMAIL ? "admin" : "user",
             password: hashed,
         })
         .returning(["id", "name", "email", "role", "isActive"]);

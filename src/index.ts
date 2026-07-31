@@ -6,6 +6,7 @@ import resourceRouter from "./routes/resource.route";
 import authRouter from "./routes/auth.route";
 import db from "./config/db";
 import { migrate } from "./generator/migrate";
+import { setupSwagger } from "./config/swagger";
 
 const app: Express = express();
 
@@ -13,7 +14,8 @@ const app: Express = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ─── Routes 
+
+setupSwagger(app);
 app.use("/health", healthRouter);
 app.use("/auth", authRouter);
 app.use("/", resourceRouter);
@@ -40,7 +42,7 @@ async function bootstrap() {
 
         // Start server only if not in a testing environment
         if (process.env.NODE_ENV !== "test") {
-            const PORT = process.env.PORT || 3000;
+            const PORT = process.env.PORT || 9999;
             app.listen(PORT, () => {
                 console.log(`Server running on port ${PORT}`);
             });

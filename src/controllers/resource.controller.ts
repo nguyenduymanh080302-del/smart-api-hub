@@ -59,6 +59,43 @@ export const getResource = async (req: Request, res: Response) => {
 };
 
 /**
+ * Controller handler to retrieve a single resource item by its ID.
+ * Supports optional relationship expansion via _expand and _embed query params.
+ */
+export const getResourceById = async (req: Request, res: Response) => {
+    const resource = req.params.resource as string;
+    const id = req.params.id as string;
+    const { _expand, _embed } = req.query;
+
+    if (!resource) {
+        return res.status(400).json({ error: "Resource is required" });
+    }
+
+    if (!id) {
+        return res.status(400).json({ error: "Resource ID is required" });
+    }
+
+    try {
+        if (!await resourceService.resourceExists(resource)) {
+            return res.status(404).json({ error: "Resource not found" });
+        }
+
+        const expand = _expand ? String(_expand).split(",") : undefined;
+        const embed = _embed ? String(_embed).split(",") : undefined;
+
+        const row = await resourceService.findById(resource, id, { expand, embed });
+        if (!row) {
+            return res.status(404).json({ error: `${resource} with id ${id} not found` });
+        }
+
+        return res.status(200).json({ data: row });
+    } catch (error: any) {
+        console.error(`${resource} DB findById failed: ${error}`);
+        return res.status(500).json({ error: error.message || "Internal Server Error" });
+    }
+};
+
+/**
  * Controller handler to insert a new resource record.
  */
 export const createResource = async (req: Request, res: Response) => {
