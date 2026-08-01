@@ -1,59 +1,45 @@
-import { Request, Response, NextFunction } from "express";
+import { RequestHandler } from "express";
 import jwt from "jsonwebtoken";
 
 const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
 
-/**
- * Extended Express Request object to hold current authenticated user details.
- */
-export interface AuthenticatedRequest extends Request {
-    user?: {
-        id: number;
-        email: string;
-        role: string;
-    };
-}
-
-/**
- * Middleware to authenticate requests via JWT tokens in the Authorization Bearer header.
- * Responds with 401 on missing or invalid tokens.
- */
-export const authenticate = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+export const authenticate: RequestHandler = (req, res, next) => {
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        return res.status(401).json({
+
+    if (!authHeader?.startsWith("Bearer ")) {
+        res.status(401).json({
             error: "Access token is missing or invalid"
         });
+        return;
     }
 
-    const token = authHeader.split(" ")[1];
-
     try {
-        const decoded = jwt.verify(token, JWT_SECRET) as any;
-        req.user = decoded;
+        req.user = jwt.verify(
+            authHeader.substring(7),
+            JWT_SECRET
+        ) as Express.Request["user"];
+
         next();
-    } catch (error) {
-        return res.status(401).json({
+    } catch {
+        res.status(401).json({
             error: "Invalid token"
         });
     }
 };
 
-/**
- * Middleware to restrict route access only to users possessing the 'admin' role.
- * Responds with 403 Forbidden if the user is authenticated but not an admin.
- */
-export const requireAdmin = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+export const requireAdmin: RequestHandler = (req, res, next) => {
     if (!req.user) {
-        return res.status(401).json({
+        res.status(401).json({
             error: "Unauthorized"
         });
+        return;
     }
 
     if (req.user.role !== "admin") {
-        return res.status(403).json({
+        res.status(403).json({
             error: "Forbidden: Admin role required"
         });
+        return;
     }
 
     next();

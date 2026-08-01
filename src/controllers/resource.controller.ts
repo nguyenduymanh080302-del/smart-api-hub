@@ -123,7 +123,7 @@ export const createResource = async (req: Request, res: Response) => {
             });
         }
 
-        const result = await resourceService.create(resource, validation.data);
+        const result = await resourceService.create(resource, validation.data, req?.user?.id || 0);
         return res.status(201).json({
             data: result,
         });
@@ -171,7 +171,7 @@ export const updateResource = async (req: Request, res: Response) => {
             });
         }
 
-        const result = await resourceService.update(resource, id, validation.data);
+        const result = await resourceService.update(resource, id, validation.data, req?.user?.id || 0);
         if (result === 0) {
             return res.status(404).json({
                 error: `Resource ${id} not found`
@@ -225,7 +225,7 @@ export const patchResource = async (req: Request, res: Response) => {
             });
         }
 
-        const result = await resourceService.update(resource, id, validation.data);
+        const result = await resourceService.update(resource, id, validation.data, req?.user?.id || 0);
         if (result === 0) {
             return res.status(404).json({
                 error: `Resource ${id} not found`
@@ -270,7 +270,7 @@ export const deleteResource = async (req: Request, res: Response) => {
             });
         }
 
-        const result = await resourceService.deleteById(resource, id);
+        const result = await resourceService.deleteById(resource, id, req?.user?.id || 0);
         if (result === 0) {
             return res.status(404).json({
                 error: `Resource ${id} not found`

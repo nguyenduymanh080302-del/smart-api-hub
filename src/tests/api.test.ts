@@ -1,11 +1,13 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { api } from "../config/api";
 import { testAdmin, testUser } from "./testData";
+import db from "../config/db";
 
 describe("Smart API Hub Integration Tests", () => {
     let userToken: string;
     let adminToken: string;
     let createdPostId: number;
+    let testUserId: number;
 
     beforeAll(() => {
         // The application grants admin access only to the configured admin email.
@@ -27,6 +29,7 @@ describe("Smart API Hub Integration Tests", () => {
         expect(res.body.data.email).toBe(testUser.email);
         expect(res.body.data.role).toBe("user");
         expect(res.body.data).not.toHaveProperty("password");
+        testUserId = res.body.data.id;
     });
 
     it("2. POST /auth/register - Fail (Validation error / Bad input)", async () => {
@@ -137,7 +140,8 @@ describe("Smart API Hub Integration Tests", () => {
             .send({
                 title: "Unauthorized Post",
                 content: "Cannot post this",
-                userId: 1
+                user_id: 1,
+                tag_id: 1
             });
 
         expect(res.status).toBe(401);
@@ -152,7 +156,8 @@ describe("Smart API Hub Integration Tests", () => {
             .send({
                 title: "Invalid Post Key",
                 content: "Content",
-                userId: 1,
+                user_id: 1,
+                tag_id: 1,
                 nonExistentColumn: "bad_value" // strict validation should fail
             });
 
@@ -168,18 +173,32 @@ describe("Smart API Hub Integration Tests", () => {
             .send({
                 title: "Test Post Title",
                 content: "Test post content",
-                userId: 1
+                user_id: 1,
+                tag_id: 1
             });
 
         expect(res.status).toBe(201);
         expect(res.body).toHaveProperty("data");
         // knex returns array of primary keys or objects
         const insertRes = res.body.data;
-        createdPostId = typeof insertRes[0] === "object" ? insertRes[0].id : insertRes[0];
+        createdPostId = insertRes.id ?? (typeof insertRes[0] === "object" ? insertRes[0].id : insertRes[0]);
         expect(createdPostId).toBeDefined();
     });
 
-    it("13. DELETE /posts/:id - Fail (Forbidden, User deleting)", async () => {
+    it("13. POST /posts - Creates an audit log", async () => {
+        const res = await api
+            .get("/audit_logs");
+
+        expect(res.status).toBe(200);
+        expect(res.body.data).toContainEqual(expect.objectContaining({
+            user_id: testUserId,
+            action: "CREATE",
+            resource_name: "posts",
+            record_id: createdPostId,
+        }));
+    });
+
+    it("14. DELETE /posts/:id - Fail (Forbidden, User deleting)", async () => {
         const res = await api
             .delete(`/posts/${createdPostId}`)
             .set("Authorization", `Bearer ${userToken}`);
@@ -189,7 +208,7 @@ describe("Smart API Hub Integration Tests", () => {
         expect(res.body.error).toContain("Admin role required");
     });
 
-    it("14. DELETE /posts/:id - Success (Admin deleting)", async () => {
+    it("15. DELETE /posts/:id - Success (Admin deleting)", async () => {
         const res = await api
             .delete(`/posts/${createdPostId}`)
             .set("Authorization", `Bearer ${adminToken}`);
@@ -197,13 +216,78 @@ describe("Smart API Hub Integration Tests", () => {
         expect(res.status).toBe(200);
     });
 
-    it("15. GET /nonexistenttable - Fail (404 Not Found)", async () => {
+    it("16. GET /nonexistenttable - Fail (404 Not Found)", async () => {
         const res = await api
             .get("/nonexistenttable");
 
         expect(res.status).toBe(404);
         expect(res.body).toHaveProperty("error");
         expect(res.body.error).toBe("Resource not found");
+    });
+
+    describe("[C]. Audit Log", () => {
+        it("should create audit log after creating a post", async () => {
+            const res = await api
+                .post("/posts")
+                .set("Authorization", `Bearer ${userToken}`)
+                .send({
+                    title: "Audit Create",
+                    content: "Audit",
+                    user_id: 1,
+                    tag_id: 1
+                });
+
+            expect(res.status).toBe(201);
+
+            const postId = res.body.data.id ?? res.body.data[0]?.id;
+
+            const log = await db("audit_logs")
+                .where({
+                    action: "CREATE",
+                    resource_name: "posts",
+                    record_id: postId
+                })
+                .first();
+
+            expect(log).toBeDefined();
+            expect(log.user_id).toBeDefined();
+        });
+    });
+
+    describe("[B]. Response Caching", () => {
+        it("GET /posts - should cache response", async () => {
+            const first = await api.get("/posts");
+
+            expect(first.status).toBe(200);
+
+            const second = await api.get("/posts");
+
+            expect(second.status).toBe(200);
+            expect(second.body).toEqual(first.body);
+        });
+        it("POST /posts - should invalidate cache", async () => {
+            // populate cache
+            await api.get("/posts");
+
+            const create = await api
+                .post("/posts")
+                .set("Authorization", `Bearer ${userToken}`)
+                .send({
+                    title: "Cache Test",
+                    content: "Invalidate cache",
+                    user_id: 1,
+                    tag_id: 1
+                });
+
+            expect(create.status).toBe(201);
+
+            const res = await api.get("/posts");
+
+            expect(res.status).toBe(200);
+            expect(
+                res.body.data.some((p: any) => p.title === "Cache Test")
+            ).toBe(true);
+        });
     });
 
     describe("[A]. Rate Limiter", () => {

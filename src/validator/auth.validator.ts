@@ -4,7 +4,7 @@ export const RegisterSchema = z.object({
     name: z.string().min(3, "Name is required"),
     email: z.email("Invalid email format"),
     password: z.string().min(6, "Password must be at least 6 characters"),
-    isActive: z.boolean().optional().default(true),
+    is_active: z.boolean().optional().default(true),
     role: z.string().optional().default("user")
 });
 

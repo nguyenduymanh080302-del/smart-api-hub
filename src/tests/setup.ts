@@ -3,7 +3,7 @@ import type { Knex } from "knex";
 import { afterAll, beforeAll } from "vitest";
 
 dotenv.config({
-    path: ".env.developement",
+    path: ".env.development",
     override: true,
 });
 

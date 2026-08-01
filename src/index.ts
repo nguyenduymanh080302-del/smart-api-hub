@@ -18,6 +18,7 @@ app.use(express.urlencoded({ extended: true }));
 setupSwagger(app);
 
 app.use(rateLimit);
+
 app.use("/health", healthRouter);
 app.use("/auth", authRouter);
 app.use("/", resourceRouter);

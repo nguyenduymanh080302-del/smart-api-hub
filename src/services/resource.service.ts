@@ -1,7 +1,9 @@
+import { clearResourceCache, getCache, setCache } from "../cache/memoryCache";
 import db from "../config/db";
 import { SENSITIVE_FIELDS } from "../utils/constant";
 import { removeSensitiveFields } from "../utils/helper";
 import { inferSchema } from "../utils/inferSchema";
+import { writeAuditLog } from "./audit.service";
 
 /**
  * Checks if a specific resource (table) exists in the database schema.
@@ -22,6 +24,15 @@ export const resourceExists = async (resource: string): Promise<boolean> => {
  * @returns A promise resolving to the list of rows and optional total count for pagination.
  */
 export const findMany = async (resource: string, options: FindManyOptions): Promise<{ rows: any[]; totalCount?: number }> => {
+    const cacheKey =
+        `${resource}:${JSON.stringify(options)}`;
+
+    const cached = getCache(cacheKey);
+
+    if (cached) {
+        return cached;
+    }
+
     const tableSchema = inferSchema().find(t => t.name === resource);
     const { fields = ["*"], filters = {}, q, sort, order = "asc", page, limit, expand = [], embed = [] } = options;
     const selectedFields =
@@ -98,7 +109,7 @@ export const findMany = async (resource: string, options: FindManyOptions): Prom
 
     // Resolve "expand" relationship (embed parent row based on foreign key match)
     for (const parentTable of expand) {
-        const foreignKey = `${parentTable.slice(0, -1)}Id`;
+        const foreignKey = `${parentTable.slice(0, -1)}_id`;
 
         // Extract a unique list of parent IDs present in the current row results
         const ids = [
@@ -128,7 +139,7 @@ export const findMany = async (resource: string, options: FindManyOptions): Prom
 
     // Resolve "embed" relationship (embed child rows based on parent key match)
     for (const childTable of embed) {
-        const foreignKey = `${resource.slice(0, -1)}Id`;
+        const foreignKey = `${resource.slice(0, -1)}_id`;
 
         // Gather all parent IDs to find their children
         const ids = rows.map(r => r.id);
@@ -157,7 +168,11 @@ export const findMany = async (resource: string, options: FindManyOptions): Prom
         });
     }
 
-    return { rows, totalCount };
+    const result = { rows, totalCount };
+
+    setCache(cacheKey, result);
+
+    return result;
 };
 
 /**
@@ -170,6 +185,14 @@ export const findMany = async (resource: string, options: FindManyOptions): Prom
  * @returns A promise resolving to the row, or null if not found.
  */
 export const findById = async (resource: string, id: string, options: Pick<FindManyOptions, "expand" | "embed"> = {}): Promise<any | null> => {
+    const cacheKey = `${resource}:${id}`;
+
+    const cached = getCache(cacheKey);
+
+    if (cached) {
+        return cached;
+    }
+
     const { expand = [], embed = [] } = options;
     const tableSchema = inferSchema().find(t => t.name === resource);
     const selectedFields = tableSchema
@@ -182,7 +205,7 @@ export const findById = async (resource: string, id: string, options: Pick<FindM
 
     // Resolve "expand" relationship (embed parent row based on foreign key match)
     for (const parentTable of expand) {
-        const foreignKey = `${parentTable.slice(0, -1)}Id`;
+        const foreignKey = `${parentTable.slice(0, -1)}_id`;
         const parentId = row[foreignKey];
         if (!parentId) {
             row[parentTable] = null;
@@ -194,11 +217,12 @@ export const findById = async (resource: string, id: string, options: Pick<FindM
 
     // Resolve "embed" relationship (embed child rows based on parent key match)
     for (const childTable of embed) {
-        const foreignKey = `${resource.slice(0, -1)}Id`;
+        const foreignKey = `${resource.slice(0, -1)}_id`;
         const children = await db(childTable).where({ [foreignKey]: row.id });
         row[childTable] = children.map(removeSensitiveFields);
     }
 
+    setCache(cacheKey, row);
     return row;
 };
 
@@ -209,8 +233,22 @@ export const findById = async (resource: string, id: string, options: Pick<FindM
  * @param data - The data payload to insert.
  * @returns A promise resolving to the database insertion result (usually insertion ID(s)).
  */
-export const create = async (resource: string, data: any): Promise<any> => {
-    return await db(resource).insert(data).returning("*");
+export const create = async (resource: string, data: any, userId: number): Promise<any> => {
+
+    if (!userId) {
+        throw new Error("Authentication failed");
+    }
+
+    const [result] = await db(resource)
+        .insert(data)
+        .returning("*");
+
+    if (result) {
+        clearResourceCache(resource);
+        await writeAuditLog({ userId, action: "CREATE", resource, recordId: result.id });
+    }
+
+    return result;
 };
 
 /**
@@ -221,19 +259,30 @@ export const create = async (resource: string, data: any): Promise<any> => {
  * @param data - The partial data payload.
  * @returns A promise resolving to the number of affected rows (0 if not found).
  */
-export const update = async (resource: string, id: string, data: any): Promise<number> => {
+export const update = async (resource: string, id: string, data: any, userId: number): Promise<number> => {
+    if (!userId) {
+        throw new Error("Authentication failed");
+    }
+
     const safeData = Object.fromEntries(
         Object.entries(data).filter(
             ([key]) => !SENSITIVE_FIELDS.includes(key)
         )
     );
 
-    return await db(resource)
+    const affected = await db(resource)
         .where({ id })
         .update({
             ...safeData,
-            updated_at: db.fn.now()
+            updated_at: db.fn.now(),
         });
+
+    if (affected > 0) {
+        clearResourceCache(resource);
+        await writeAuditLog({ userId, action: "UPDATE", resource, recordId: Number(id) });
+    }
+
+    return affected;
 };
 
 /**
@@ -243,6 +292,18 @@ export const update = async (resource: string, id: string, data: any): Promise<n
  * @param id - The ID of the record to delete.
  * @returns A promise resolving to the number of deleted rows (0 if not found).
  */
-export const deleteById = async (resource: string, id: string): Promise<number> => {
-    return await db(resource).where({ id }).delete();
+export const deleteById = async (resource: string, id: string, userId: number): Promise<number> => {
+    if (!userId) {
+        throw new Error("Authentication/Authorization failed");
+    }
+    const affected = await db(resource)
+        .where({ id })
+        .del();
+
+    if (affected > 0) {
+        clearResourceCache(resource);
+        await writeAuditLog({ userId, action: "DELETE", resource, recordId: Number(id) });
+    }
+
+    return affected;
 };

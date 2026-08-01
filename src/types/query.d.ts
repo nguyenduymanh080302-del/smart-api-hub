@@ -18,3 +18,8 @@ interface FindManyOptions {
     /** Child tables to embed (nest children arrays) */
     embed?: string[];
 }
+
+interface CacheEntry {
+    data: any
+    expiresAt: number
+}
