@@ -1,5 +1,42 @@
 # Project: Smart API Hub
 
+## System Architecture
+
+```mermaid
+flowchart LR
+    Client["🌐 API Client<br/>(Postman / Frontend / Swagger UI)"]
+
+    subgraph Hub["🚀 Smart API Hub"]
+        Express["Express API"]
+
+        subgraph Pipeline["Request Pipeline"]
+            Middleware["Middleware<br/>• JSON Parser<br/>• Rate Limiter<br/>• Global Error Handler"]
+            Routes["Routes<br/>• Health<br/>• Auth<br/>• Dynamic Resources"]
+            Auth["Authentication & Authorization<br/>• JWT<br/>• Admin Guard"]
+            Services["Services<br/>• Auth Service<br/>• Resource Service"]
+        end
+
+        Cache[("⚡ In-Memory Cache<br/>30-second TTL")]
+        Migration["Auto Migration<br/>Schema Inference"]
+    end
+
+    Database[("🐘 PostgreSQL")]
+    Audit[("📝 audit_logs")]
+
+    Client --> Express
+    Express --> Middleware
+    Middleware --> Routes
+    Routes --> Auth
+    Routes --> Services
+
+    Services <-->|Read / Write| Cache
+    Services -->|Knex.js| Database
+    Migration -->|Startup Sync| Database
+    Services -->|Write Activity| Audit
+    Audit --> Database
+```
+```
+
 ## Tech Stack/Required
 - **Backend:** Node.js (>=24), TypeScript(>=7), Express.js(>=5)
 - **Database:** PostgreSQL(>=18), Knex.js(>=3)
