@@ -35,7 +35,6 @@ flowchart LR
     Services -->|Write Activity| Audit
     Audit --> Database
 ```
-```
 
 ## Tech Stack/Required
 - **Backend:** Node.js (>=24), TypeScript(>=7), Express.js(>=5)
