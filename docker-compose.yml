@@ -1,24 +1,24 @@
 services:
   app:
     build: .
-    container_name: smart-api-hub
+    container_name: manhnd111-smart-api-hub
     restart: unless-stopped
     ports:
-      - "9999:9999"
+      - "${PORT}:${PORT}"
     depends_on:
       - postgres
     env_file:
       - .env
   postgres:
     image: postgres:18.4
-    container_name: smart-api-hub-db
+    container_name: manhnd111-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: postgres
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: manhnd111
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     ports:
-      - "5432:5432"
+      - "${DB_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql
 
